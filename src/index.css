@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    background-color: #fcf8ff;
+    color: #1b163a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  /* Mesh gradient background */
+  .mesh-gradient {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #A855F7 100%);
+  }
+
+  /* Glass morphism panels */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-pill {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-white rounded-[20px] p-card-padding shadow-card transition-all duration-200;
+  }
+  .card:hover {
+    @apply shadow-card-hover;
+  }
+
+  /* Text gradient */
+  .text-gradient {
+    background: linear-gradient(135deg, #A855F7, #4F46E5);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Mesh orb background for dark sections */
+  .mesh-bg {
+    background-color: #0F0A2E;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Loading screen */
+  .loading-screen {
+    @apply flex flex-col items-center justify-center h-screen w-screen bg-background;
+  }
+  .loading-spinner {
+    @apply w-10 h-10 rounded-full border-4 border-surface-container-highest border-t-primary animate-spin mb-4;
+  }
+
+  /* Sidebar nav link */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200;
+  }
+  .sidebar-link-active {
+    @apply bg-primary text-white font-bold;
+  }
+  .sidebar-link-inactive {
+    @apply text-sidebar-text hover:text-white hover:bg-white/10;
+  }
+
+  /* Dot pattern background */
+  .dot-bg {
+    background-image: radial-gradient(#DDD6FE 0.8px, transparent 0.8px);
+    background-size: 24px 24px;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply h-2 bg-surface-container-highest rounded-full overflow-hidden;
+  }
+  .progress-bar-fill {
+    @apply h-full rounded-full transition-all duration-700 ease-out;
+  }
+}
+
+@layer utilities {
+  .stagger-up {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: slideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c7c4d8;
+  border-radius: 10px;
+}
