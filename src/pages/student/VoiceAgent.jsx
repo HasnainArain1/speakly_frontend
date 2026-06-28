@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { voiceAPI } from '../../services/api';
 import useVoiceRecorder from '../../hooks/useVoiceRecorder';
 import toast from 'react-hot-toast';
-import { Mic, Volume2, VolumeX, Square, ArrowLeft, Loader2, Sparkles, Trophy, CheckCircle, BrainCircuit, AlertTriangle, Target, XCircle } from 'lucide-react';
+import { Mic, Volume2, VolumeX, Square, ArrowLeft, Loader2, Sparkles, Trophy, CheckCircle, BrainCircuit, AlertTriangle, Target, XCircle, ChevronDown, Play } from 'lucide-react';
 
 export default function VoiceAgent() {
   const navigate = useNavigate();
@@ -23,6 +23,12 @@ export default function VoiceAgent() {
   const [showReport, setShowReport] = useState(false);
   const [report, setReport] = useState(null);
   const [loadingReport, setLoadingReport] = useState(false);
+
+  // Voice selection state
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState(() => localStorage.getItem('speakly_voice') || '');
+  const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const voicePickerRef = useRef(null);
 
   const timerRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -47,6 +53,125 @@ export default function VoiceAgent() {
     }
     return () => clearInterval(timerRef.current);
   }, [sessionActive, showReport]);
+
+  // Load available voices from the browser — only show reliably working ones
+  useEffect(() => {
+    // Whitelist of voice info with friendly name, gender, and quality
+    const VOICE_INFO = {
+      // Edge Online Natural Voices
+      'microsoft jenny': { friendlyName: 'Jenny (US)', gender: 'Female', quality: 'Natural' },
+      'microsoft guy': { friendlyName: 'Guy (US)', gender: 'Male', quality: 'Natural' },
+      'microsoft sonia': { friendlyName: 'Sonia (UK)', gender: 'Female', quality: 'Natural' },
+      'microsoft ryan': { friendlyName: 'Ryan (UK)', gender: 'Male', quality: 'Natural' },
+      'andrew multilingual': { friendlyName: 'Andrew (US)', gender: 'Male', quality: 'Natural' },
+      
+      // Google Voices (Chrome)
+      'google us english': { friendlyName: 'Google (US)', gender: 'Female', quality: 'Standard' },
+      'google uk english female': { friendlyName: 'Google Female (UK)', gender: 'Female', quality: 'Standard' },
+      'google uk english male': { friendlyName: 'Google Male (UK)', gender: 'Male', quality: 'Standard' },
+      
+      // Local Windows Voices
+      'microsoft david': { friendlyName: 'David (US)', gender: 'Male', quality: 'Standard' },
+      'microsoft zira': { friendlyName: 'Zira (US)', gender: 'Female', quality: 'Standard' },
+      'microsoft george': { friendlyName: 'George (UK)', gender: 'Male', quality: 'Standard' },
+      
+      // Apple / Safari Voices
+      'samantha': { friendlyName: 'Samantha (US)', gender: 'Female', quality: 'Standard' },
+      'daniel': { friendlyName: 'Daniel (UK)', gender: 'Male', quality: 'Standard' },
+      'karen': { friendlyName: 'Karen (AU)', gender: 'Female', quality: 'Standard' },
+      'moira': { friendlyName: 'Moira (IE)', gender: 'Female', quality: 'Standard' },
+      'tessa': { friendlyName: 'Tessa (ZA)', gender: 'Female', quality: 'Standard' }
+    };
+
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+
+      // Find whitelisted voices
+      const matched = [];
+      englishVoices.forEach(voice => {
+        const lowerName = voice.name.toLowerCase();
+        const key = Object.keys(VOICE_INFO).find(k => lowerName.includes(k));
+        if (key) {
+          const info = VOICE_INFO[key];
+          matched.push({
+            id: voice.name,
+            name: voice.name,
+            friendlyName: info.friendlyName,
+            gender: info.gender,
+            quality: info.quality,
+            lang: voice.lang,
+            nativeVoice: voice
+          });
+        }
+      });
+
+      // If we don't have enough matched voices, fill up using other English voices
+      englishVoices.forEach(voice => {
+        if (matched.length >= 5) return;
+        if (matched.some(m => m.id === voice.name)) return;
+
+        const lower = voice.name.toLowerCase();
+        let gender = 'Female';
+        if (lower.includes('guy') || lower.includes('male') || lower.includes('david') || lower.includes('george') || lower.includes('daniel') || lower.includes('ryan')) {
+          gender = 'Male';
+        }
+
+        matched.push({
+          id: voice.name,
+          name: voice.name,
+          friendlyName: voice.name.replace(/Microsoft |Google |Apple /gi, '').split(' ')[0],
+          gender: gender,
+          quality: voice.name.toLowerCase().includes('natural') ? 'Natural' : 'Standard',
+          lang: voice.lang,
+          nativeVoice: voice
+        });
+      });
+
+      // Limit to exactly 5 custom voices
+      const selectedCustom = matched.slice(0, 5);
+
+      // Build the final list: Default Voice + 5 Custom Voices
+      const final = [
+        {
+          id: 'default',
+          name: 'default',
+          friendlyName: 'Default Voice',
+          gender: 'System',
+          quality: 'Default',
+          lang: 'en-US',
+          nativeVoice: null
+        },
+        ...selectedCustom
+      ];
+
+      setAvailableVoices(final);
+
+      // Restore saved voice or default to first
+      const saved = localStorage.getItem('speakly_voice');
+      if (saved && final.some(v => v.id === saved)) {
+        setSelectedVoiceName(saved);
+      } else {
+        setSelectedVoiceName('default');
+        localStorage.setItem('speakly_voice', 'default');
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => { window.speechSynthesis.onvoiceschanged = null; };
+  }, []);
+
+  // Close voice picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (voicePickerRef.current && !voicePickerRef.current.contains(e.target)) {
+        setShowVoicePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Cleanup speech synthesis and intervals on unmount
   useEffect(() => {
@@ -160,6 +285,12 @@ export default function VoiceAgent() {
         utterance.lang = 'en-US';
         utterance.rate = 1.0;
         utterance.pitch = 1.0;
+
+        // Apply user-selected voice
+        if (selectedVoiceName && selectedVoiceName !== 'default') {
+          const chosen = window.speechSynthesis.getVoices().find(v => v.name === selectedVoiceName);
+          if (chosen) utterance.voice = chosen;
+        }
 
         // Keep a strong reference in a React ref to prevent garbage collection
         activeUtteranceRef.current = utterance;
@@ -308,7 +439,100 @@ export default function VoiceAgent() {
           </div>
         </div>
 
-        <div className="w-10" />
+        {/* Voice Selector */}
+        <div className="relative" ref={voicePickerRef}>
+          <button
+            onClick={() => setShowVoicePicker(!showVoicePicker)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors text-sm"
+            title="Select AI Voice"
+          >
+            <Volume2 size={16} className="text-primary" />
+            <span className="text-gray-700 font-medium max-w-[120px] truncate hidden sm:inline">
+              {availableVoices.find(v => v.id === selectedVoiceName)?.friendlyName || 'Default Voice'}
+            </span>
+            <ChevronDown size={14} className={`text-gray-500 transition-transform ${showVoicePicker ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showVoicePicker && (
+            <div className="absolute right-0 top-full mt-2 w-80 max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1">
+              <div className="px-4 py-2 border-b border-gray-100">
+                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Select AI Voice — tap ▶ to preview</p>
+              </div>
+              {availableVoices.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">No voices available</p>
+              ) : (
+                availableVoices.map((voice) => {
+                  const isNatural = voice.quality === 'Natural';
+                  const isDefault = voice.id === 'default';
+                  return (
+                    <div
+                      key={voice.id}
+                      className={`flex items-center justify-between px-4 py-2.5 hover:bg-primary/5 transition-colors ${
+                        selectedVoiceName === voice.id
+                          ? 'bg-primary/10'
+                          : ''
+                      }`}
+                    >
+                      <button
+                        onClick={() => {
+                          setSelectedVoiceName(voice.id);
+                          localStorage.setItem('speakly_voice', voice.id);
+                          setShowVoicePicker(false);
+                        }}
+                        className="flex-1 text-left flex flex-col min-w-0"
+                      >
+                        <span className={`text-sm truncate ${
+                          selectedVoiceName === voice.id ? 'text-primary font-semibold' : 'text-gray-700'
+                        }`}>
+                          {voice.friendlyName}
+                        </span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-gray-400 uppercase">{voice.lang}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                            voice.gender === 'Female' 
+                              ? 'bg-pink-100 text-pink-700' 
+                              : voice.gender === 'Male'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-gray-150 text-gray-600'
+                          }`}>
+                            {voice.gender}
+                          </span>
+                          {isNatural && (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">NATURAL</span>
+                          )}
+                        </div>
+                      </button>
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        {!isDefault && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.speechSynthesis.cancel();
+                              const testUtterance = new SpeechSynthesisUtterance('Hello, I am your English tutor.');
+                              if (voice.nativeVoice) {
+                                testUtterance.voice = voice.nativeVoice;
+                                testUtterance.lang = voice.nativeVoice.lang;
+                              }
+                              testUtterance.rate = 1.0;
+                              window.speechSynthesis.speak(testUtterance);
+                            }}
+                            className="w-7 h-7 rounded-full bg-gray-100 hover:bg-primary/10 flex items-center justify-center transition-colors"
+                            title="Preview this voice"
+                          >
+                            <Play size={12} className="text-gray-600 ml-0.5" />
+                          </button>
+                        )}
+                        {selectedVoiceName === voice.id && (
+                          <CheckCircle size={16} className="text-primary" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Main Content Area */}
