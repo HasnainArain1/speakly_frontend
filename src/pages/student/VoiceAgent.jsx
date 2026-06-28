@@ -241,6 +241,11 @@ export default function VoiceAgent() {
         return;
       }
 
+      // Get voice name and gender to align the AI's identity
+      const activeVoice = availableVoices.find(v => v.id === selectedVoiceName);
+      const voiceName = activeVoice && activeVoice.id !== 'default' ? activeVoice.friendlyName.split(' ')[0] : 'Aria';
+      const voiceGender = activeVoice ? activeVoice.gender : 'Female';
+
       // 2. Get AI Response
       const responseRes = await voiceAPI.respond({
         session_id: sessionId,
@@ -249,6 +254,8 @@ export default function VoiceAgent() {
         topic,
         difficulty,
         conversation,
+        voice_name: voiceName,
+        voice_gender: voiceGender
       });
 
       setSessionId(responseRes.data.session_id);
