@@ -90,22 +90,13 @@ export default function StudentHome() {
       <div className="space-y-8 animate-fade-in text-gray-900">
         
         {/* Top Header Row for Student Dashboard */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-gray-900">
-              Welcome back, <span className="text-primary font-extrabold">{user?.first_name || 'Student'}</span>!
-            </h2>
-            <p className="text-xs text-gray-500 font-semibold mt-0.5">
-              Let's build your English speaking skills with our AI features.
-            </p>
-          </div>
-          
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 px-4.5 py-2 border border-red-200 text-red-500 text-xs font-bold rounded-xl hover:bg-red-50 transition-all self-start sm:self-center"
-          >
-            <LogOut size={13} /> Sign Out
-          </button>
+        <div className="border-b border-gray-200 pb-4">
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+            Welcome back, <span className="text-primary font-extrabold">{user?.first_name || 'Student'}</span>!
+          </h2>
+          <p className="text-xs text-gray-500 font-semibold mt-0.5">
+            Let's build your English speaking skills with our AI features.
+          </p>
         </div>
 
         {/* Hero Banner Section */}
