@@ -194,6 +194,9 @@ export const teacherAPI = {
   createAssignment: (data) =>
     api.post('/teacher/assignments', data),
 
+  generateAssignmentPreview: (data) =>
+    api.post('/teacher/assignments/generate-preview', data),
+
   getAssignments: () =>
     api.get('/teacher/assignments'),
 

@@ -5,8 +5,41 @@ import toast from 'react-hot-toast';
 import { 
   Users, Mail, ClipboardList, TrendingUp, Award, 
   UserCheck, ShieldCheck, LogOut, PlusCircle, Calendar, 
-  Flame, X, Search, Sparkles, MessageSquare, ArrowRight 
+  Flame, X, Search, Sparkles, MessageSquare, ArrowRight,
+  Eye, ArrowLeft, BookOpen, CheckCircle2, Shield
 } from 'lucide-react';
+
+const RECOMMENDATIONS = [
+  { id: '1', title: 'Present Simple', desc: 'Habits, routines & general truths', topic: 'Present Simple Tense' },
+  { id: '2', title: 'Present Perfect', desc: 'Actions linked to the present', topic: 'Present Perfect Tense' },
+  { id: '3', title: 'Active & Passive', desc: 'Voice shifts & agent focus', topic: 'Active and Passive Voice' },
+  { id: '4', title: 'First Conditional', desc: 'Real possibilities & outcomes', topic: 'First Conditional Sentences' },
+  { id: '5', title: 'Modal Verbs', desc: 'Ability, permission & obligation', topic: 'Modal Verbs: Can, Could, May, Might' },
+  { id: '6', title: 'Direct & Indirect', desc: 'Reported speech conventions', topic: 'Direct and Indirect Speech' },
+];
+
+const renderMarkdownSimple = (text) => {
+  if (!text) return null;
+  return text.split('\n').map((line, i) => {
+    if (line.trim().startsWith('# ')) {
+      return <h1 key={i} className="text-lg font-black text-slate-805 mt-4 mb-2 border-b border-gray-100 pb-1">{line.replace(/^#\s+/, '')}</h1>;
+    }
+    if (line.trim().startsWith('## ')) {
+      return <h2 key={i} className="text-sm font-extrabold text-indigo-650 mt-3 mb-1.5 uppercase tracking-wider">{line.replace(/^##\s+/, '')}</h2>;
+    }
+    if (line.trim().startsWith('### ')) {
+      return <h3 key={i} className="text-sm font-bold text-slate-700 mt-2 mb-1">{line.replace(/^###\s+/, '')}</h3>;
+    }
+    if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+      return <li key={i} className="ml-4 list-disc text-xs text-gray-600 mb-1 leading-relaxed">{line.replace(/^[\*\-]\s+/, '')}</li>;
+    }
+    if (/^\d+\.\s/.test(line.trim())) {
+      return <li key={i} className="ml-4 list-decimal text-xs text-slate-700 font-bold mb-2 leading-relaxed">{line.trim().replace(/^\d+\.\s+/, '')}</li>;
+    }
+    return <p key={i} className="text-xs text-gray-500 min-h-[0.5rem] leading-relaxed mb-2">{line}</p>;
+  });
+};
+
 
 export default function TeacherDashboard() {
   const { logout } = useAuth();
@@ -27,6 +60,14 @@ export default function TeacherDashboard() {
   const [creationMethod, setCreationMethod] = useState('ai'); // default to 'ai'
   const [assignmentTopic, setAssignmentTopic] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Advanced Wizard States
+  const [wizardStep, setWizardStep] = useState('setup'); // 'setup' | 'preview'
+  const [previewTitle, setPreviewTitle] = useState('');
+  const [previewDesc, setPreviewDesc] = useState('');
+  const [maxScore, setMaxScore] = useState(100);
+  const [dueDate, setDueDate] = useState('');
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -51,31 +92,68 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleCreateAssignment = async (e) => {
+  const handleGeneratePreview = async (e) => {
     e.preventDefault();
-    if (creationMethod === 'manual' && !assignmentTitle.trim()) {
-      toast.error('Title is required');
-      return;
-    }
     if (creationMethod === 'ai' && !assignmentTopic.trim()) {
       toast.error('Topic is required');
       return;
     }
+    if (creationMethod === 'manual' && !assignmentTitle.trim()) {
+      toast.error('Title is required');
+      return;
+    }
+
+    if (creationMethod === 'ai') {
+      setGenerating(true);
+      try {
+        const res = await teacherAPI.generateAssignmentPreview({ topic: assignmentTopic.trim() });
+        setPreviewTitle(res.data.title);
+        setPreviewDesc(res.data.description);
+        setWizardStep('preview');
+        toast.success('Assignment draft generated with AI!');
+      } catch (err) {
+        toast.error(err.response?.data?.detail || 'Failed to generate preview with AI');
+      } finally {
+        setGenerating(false);
+      }
+    } else {
+      setPreviewTitle(assignmentTitle.trim());
+      setPreviewDesc(assignmentDesc.trim());
+      setWizardStep('preview');
+    }
+  };
+
+  const handlePublishAssignment = async (e) => {
+    e.preventDefault();
+    if (!previewTitle.trim()) {
+      toast.error('Title is required');
+      return;
+    }
     setCreating(true);
     try {
-      const payload = creationMethod === 'ai'
-        ? { topic: assignmentTopic.trim(), max_score: 100 }
-        : { title: assignmentTitle.trim(), description: assignmentDesc.trim(), max_score: 100 };
+      const payload = {
+        title: previewTitle.trim(),
+        description: previewDesc.trim(),
+        max_score: parseInt(maxScore) || 100,
+        due_date: dueDate ? new Date(dueDate).toISOString() : null
+      };
 
       await teacherAPI.createAssignment(payload);
-      toast.success(creationMethod === 'ai' ? 'AI generated assignment successfully created!' : 'Assignment created!');
+      toast.success('Assignment created & published successfully!');
+      
+      // Reset form states
       setAssignmentTitle('');
       setAssignmentDesc('');
       setAssignmentTopic('');
+      setPreviewTitle('');
+      setPreviewDesc('');
+      setMaxScore(100);
+      setDueDate('');
+      setWizardStep('setup');
       setShowAssignmentForm(false);
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to create assignment');
+      toast.error(err.response?.data?.detail || 'Failed to publish assignment');
     } finally {
       setCreating(false);
     }
@@ -184,122 +262,239 @@ export default function TeacherDashboard() {
 
         {/* Assignment Creation Form */}
         {showAssignmentForm && (
-          <section className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm animate-fade-in space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-800">Create New Student Assignment</h3>
-                <p className="text-xs text-gray-400 mt-0.5 font-medium">Students will see this assignment instantly in their progress dashboard.</p>
-              </div>
-
-              {/* Method Selector */}
-              <div className="flex gap-1.5 p-1 bg-slate-50 border border-gray-100 rounded-xl w-max self-start sm:self-center">
-                <button
-                  type="button"
-                  onClick={() => setCreationMethod('ai')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    creationMethod === 'ai'
-                      ? 'bg-white text-indigo-600 shadow-sm border border-gray-200/50'
-                      : 'text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  <Sparkles size={12} className={creationMethod === 'ai' ? 'text-indigo-500' : 'text-gray-400'} /> AI Generated
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCreationMethod('manual')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    creationMethod === 'manual'
-                      ? 'bg-white text-slate-800 shadow-sm border border-gray-200/50'
-                      : 'text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  <ClipboardList size={12} /> Manual Setup
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreateAssignment} className="space-y-4">
-              {creationMethod === 'ai' ? (
-                <div className="space-y-3">
+          <section className="bg-white rounded-3xl border border-gray-100 p-6 shadow-md animate-fade-in space-y-6">
+            {wizardStep === 'setup' ? (
+              <form onSubmit={handleGeneratePreview} className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Select Grammar Topic</label>
-                    <select
-                      value={assignmentTopic}
-                      onChange={(e) => setAssignmentTopic(e.target.value)}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-sm font-semibold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
-                    >
-                      <option value="">-- Select a topic --</option>
-                      <option value="Present Simple Tense">Present Simple Tense</option>
-                      <option value="Past Simple Tense">Past Simple Tense</option>
-                      <option value="Present Perfect Tense">Present Perfect Tense</option>
-                      <option value="Future Tense Rules">Future Tense Rules</option>
-                      <option value="Modal Verbs: Can, Could, May, Might">Modal Verbs: Can, Could, May, Might</option>
-                      <option value="Active and Passive Voice">Active and Passive Voice</option>
-                      <option value="Direct and Indirect Speech">Direct and Indirect Speech</option>
-                      <option value="Prepositions of Time and Place">Prepositions of Time and Place</option>
-                      <option value="First Conditional Sentences">First Conditional Sentences</option>
-                    </select>
+                    <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                      <Sparkles className="text-indigo-650" size={18} /> New Assignment Builder
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5 font-medium">Select how you want to build this assignment for your students.</p>
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase">Or type a custom topic</span>
-                    <input
-                      type="text"
-                      placeholder="e.g. Present Perfect Continuous, Modal Verbs of obligation..."
-                      value={assignmentTopic}
-                      onChange={(e) => setAssignmentTopic(e.target.value)}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-sm font-semibold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
-                    />
+
+                  {/* Method Selector */}
+                  <div className="flex gap-1 p-1 bg-slate-50 border border-gray-150 rounded-xl w-max self-start sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => setCreationMethod('ai')}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        creationMethod === 'ai'
+                          ? 'bg-white text-indigo-650 shadow-sm border border-gray-250/20'
+                          : 'text-gray-405 hover:text-gray-600'
+                      }`}
+                    >
+                      <Sparkles size={12} className={creationMethod === 'ai' ? 'text-indigo-505' : 'text-gray-400'} /> AI Generated
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreationMethod('manual')}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        creationMethod === 'manual'
+                          ? 'bg-white text-slate-800 shadow-sm border border-gray-255/20'
+                          : 'text-gray-405 hover:text-gray-600'
+                      }`}
+                    >
+                      <ClipboardList size={12} /> Manual Setup
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Title</label>
-                    <input
-                      type="text"
-                      value={assignmentTitle}
-                      onChange={(e) => setAssignmentTitle(e.target.value)}
-                      placeholder="e.g., Past Tense Exercises"
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-sm font-semibold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Instructions / Description</label>
-                    <textarea
-                      value={assignmentDesc}
-                      onChange={(e) => setAssignmentDesc(e.target.value)}
-                      placeholder="Tell students what to do..."
-                      rows={3}
-                      className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all resize-none"
-                    />
-                  </div>
-                </>
-              )}
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAssignmentForm(false)}
-                  className="py-2.5 px-6 rounded-xl border border-gray-200 text-gray-500 hover:bg-slate-50 font-bold text-xs transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="py-2.5 px-6 rounded-xl bg-slate-900 text-white hover:bg-slate-800 font-bold text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {creating ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {creationMethod === 'ai' ? 'Generating with AI...' : 'Creating...'}
-                    </>
-                  ) : (
-                    creationMethod === 'ai' ? 'Generate & Create with AI' : 'Create Assignment'
-                  )}
-                </button>
-              </div>
-            </form>
+                {creationMethod === 'ai' ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Quick Topic Select</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {RECOMMENDATIONS.map((rec) => (
+                          <div
+                            key={rec.id}
+                            onClick={() => setAssignmentTopic(rec.topic)}
+                            className={`p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 ${
+                              assignmentTopic === rec.topic
+                                ? 'bg-indigo-50/40 border-indigo-500 shadow-sm'
+                                : 'bg-white border-gray-100 hover:border-gray-300 hover:bg-slate-50/50'
+                            }`}
+                          >
+                            <span className="text-xs font-bold text-slate-800 block">{rec.title}</span>
+                            <span className="text-[10px] text-gray-400 font-medium block mt-0.5 line-clamp-1">{rec.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 pt-1">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Custom Topic Input</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Third Conditional Sentences, Prepositions of Movement..."
+                        value={assignmentTopic}
+                        onChange={(e) => setAssignmentTopic(e.target.value)}
+                        className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Title</label>
+                      <input
+                        type="text"
+                        value={assignmentTitle}
+                        onChange={(e) => setAssignmentTitle(e.target.value)}
+                        placeholder="e.g., Past Simple Exercises"
+                        className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Instructions / Description</label>
+                      <textarea
+                        value={assignmentDesc}
+                        onChange={(e) => setAssignmentDesc(e.target.value)}
+                        placeholder="Provide details and tasks for students..."
+                        rows={4}
+                        className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-xs font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAssignmentForm(false);
+                      setWizardStep('setup');
+                    }}
+                    className="py-2.5 px-6 rounded-xl border border-gray-200 text-gray-500 hover:bg-slate-50 font-bold text-xs transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={generating}
+                    className="py-2.5 px-6 rounded-xl bg-slate-900 text-white hover:bg-slate-800 font-bold text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                  >
+                    {generating ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Generating Draft...
+                      </>
+                    ) : (
+                      creationMethod === 'ai' ? 'Generate Draft with AI' : 'Continue to Preview'
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handlePublishAssignment} className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                      <Eye className="text-indigo-650" size={18} /> Review & Edit Assignment
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5 font-medium">Verify the details, tweak the content, and publish when ready.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  {/* Left Side — Configuration */}
+                  <div className="lg:col-span-5 space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Assignment Title</label>
+                      <input
+                        type="text"
+                        value={previewTitle}
+                        onChange={(e) => setPreviewTitle(e.target.value)}
+                        className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Assignment Content (Markdown)</label>
+                      <textarea
+                        value={previewDesc}
+                        onChange={(e) => setPreviewDesc(e.target.value)}
+                        rows={10}
+                        className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-xs font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all font-mono leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Max Score (XP)</label>
+                        <input
+                          type="number"
+                          value={maxScore}
+                          onChange={(e) => setMaxScore(e.target.value)}
+                          className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Due Date (Optional)</label>
+                        <input
+                          type="date"
+                          value={dueDate}
+                          onChange={(e) => setDueDate(e.target.value)}
+                          className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side — Live Interactive Preview */}
+                  <div className="lg:col-span-7 flex flex-col">
+                    <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Eye size={12} /> Live Rendered Preview
+                    </span>
+                    <div className="flex-1 bg-slate-50 border border-gray-150 p-6 rounded-2xl max-h-[380px] overflow-y-auto space-y-3 prose max-w-none shadow-inner">
+                      <h2 className="text-sm font-black text-slate-800 border-b border-gray-250 pb-2">{previewTitle || 'Untitled Assignment'}</h2>
+                      <div className="mt-2">
+                        {renderMarkdownSimple(previewDesc) || <p className="text-xs text-gray-400 italic">No content preview available. Write some text on the left.</p>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep('setup')}
+                    className="py-2.5 px-4 rounded-xl border border-gray-255 text-gray-600 hover:bg-slate-50 font-bold text-xs transition-colors flex items-center gap-1"
+                  >
+                    <ArrowLeft size={14} /> Back to Setup
+                  </button>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAssignmentForm(false);
+                        setWizardStep('setup');
+                      }}
+                      className="py-2.5 px-6 rounded-xl border border-gray-200 text-gray-500 hover:bg-slate-50 font-bold text-xs transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={creating}
+                      className="py-2.5 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 font-bold text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-md shadow-indigo-600/10"
+                    >
+                      {creating ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Publishing...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={14} /> Publish & Assign
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
           </section>
         )}
 

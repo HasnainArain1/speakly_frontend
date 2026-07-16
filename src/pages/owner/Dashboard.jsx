@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { ownerAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { 
-  Users, Mail, PlusCircle, Trash2, Shield, UserCheck, 
-  Award, Star, X, Search, Calendar, Flame, Layers, 
-  Sparkles, CheckCircle2, AlertTriangle, ArrowRight 
+import {
+  Users, Mail, PlusCircle, Trash2, Shield, UserCheck,
+  Award, Star, X, Search, Calendar, Flame, Layers,
+  Sparkles, CheckCircle2, AlertTriangle, ArrowRight
 } from 'lucide-react';
 
 export default function OwnerDashboard() {
@@ -118,19 +118,52 @@ export default function OwnerDashboard() {
     );
   }
 
-  const { organization, total_students, total_teachers, students, teachers } = dashboardData;
+  if (!dashboardData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#fafcfb] p-6 text-center">
+        <div className="max-w-md bg-white p-8 rounded-3xl border border-gray-100 shadow-xl space-y-6">
+          <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto">
+            <AlertTriangle size={32} />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-slate-800">No Organization Linked</h3>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Your owner account is not currently linked to any organization. Please contact the administrator or update your user's <code>organization_id</code> in the database.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.clear();
+              window.location.href = '/';
+            }}
+            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { 
+    organization = { name: 'Unknown Organization', plan: 'standard', seats_used: 0, max_seats: 100 }, 
+    total_students = 0, 
+    total_teachers = 0, 
+    students = [], 
+    teachers = [] 
+  } = dashboardData;
   const seatProgress = Math.min(
     100,
     Math.round((organization.seats_used / organization.max_seats) * 100)
   );
 
   // Filtered lists for modals
-  const filteredStudents = registeredStudents.filter(s => 
+  const filteredStudents = registeredStudents.filter(s =>
     s.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredTeachers = registeredTeachers.filter(t => 
+  const filteredTeachers = registeredTeachers.filter(t =>
     t.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -148,7 +181,7 @@ export default function OwnerDashboard() {
             <span className="text-[10px] block font-bold text-gray-400 tracking-wider uppercase">B2B Owner Console</span>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-6">
           <div className="hidden sm:flex flex-col text-right">
             <span className="text-sm font-bold text-gray-800">{organization.name}</span>
@@ -206,7 +239,7 @@ export default function OwnerDashboard() {
         {/* Info Cards */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Total Students Card (Interactive) */}
-          <div 
+          <div
             onClick={() => {
               setSearchQuery('');
               setShowStudentModal(true);
@@ -227,7 +260,7 @@ export default function OwnerDashboard() {
           </div>
 
           {/* Active Teachers Card (Interactive) */}
-          <div 
+          <div
             onClick={() => {
               setSearchQuery('');
               setShowTeacherModal(true);
@@ -286,21 +319,19 @@ export default function OwnerDashboard() {
             <div className="flex p-1 bg-gray-200/60 rounded-xl shrink-0">
               <button
                 onClick={() => setWhitelistTab('students')}
-                className={`px-4 py-2 rounded-lg text-xs font-extrabold uppercase transition-all ${
-                  whitelistTab === 'students'
+                className={`px-4 py-2 rounded-lg text-xs font-extrabold uppercase transition-all ${whitelistTab === 'students'
                     ? 'bg-white text-indigo-600 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 Students Whitelist
               </button>
               <button
                 onClick={() => setWhitelistTab('teachers')}
-                className={`px-4 py-2 rounded-lg text-xs font-extrabold uppercase transition-all ${
-                  whitelistTab === 'teachers'
+                className={`px-4 py-2 rounded-lg text-xs font-extrabold uppercase transition-all ${whitelistTab === 'teachers'
                     ? 'bg-white text-purple-600 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 Teachers Whitelist
               </button>
@@ -462,7 +493,7 @@ export default function OwnerDashboard() {
               {assignments.length} Total Assignments
             </span>
           </div>
-          
+
           <div className="p-6">
             {assignments.length === 0 ? (
               <div className="text-center text-gray-400 py-12 italic">
@@ -517,7 +548,7 @@ export default function OwnerDashboard() {
                   <p className="text-xs text-gray-400">Total registered in database: {registeredStudents.length}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowStudentModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500"
               >
@@ -546,8 +577,8 @@ export default function OwnerDashboard() {
               ) : (
                 <div className="grid grid-cols-1 gap-4">
                   {filteredStudents.map((stud) => (
-                    <div 
-                      key={stud.id} 
+                    <div
+                      key={stud.id}
                       className="p-4 rounded-2xl border border-gray-100 bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                     >
                       <div className="space-y-1">
@@ -596,7 +627,7 @@ export default function OwnerDashboard() {
                   <p className="text-xs text-gray-400">Total registered in database: {registeredTeachers.length}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowTeacherModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500"
               >
@@ -625,8 +656,8 @@ export default function OwnerDashboard() {
               ) : (
                 <div className="grid grid-cols-1 gap-4">
                   {filteredTeachers.map((teach) => (
-                    <div 
-                      key={teach.id} 
+                    <div
+                      key={teach.id}
                       className="p-4 rounded-2xl border border-gray-100 bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                     >
                       <div className="space-y-1">
